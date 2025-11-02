@@ -1,0 +1,387 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Budget Tracker</title>
+    <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+    <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/recharts@2.5.0/dist/Recharts.js"></script>
+</head>
+<body>
+    <div id="root"></div>
+
+    <script type="text/babel">
+        const { useState, useEffect } = React;
+        const { PieChart, Pie, Cell, ResponsiveContainer, Legend, Tooltip, BarChart, Bar, XAxis, YAxis, CartesianGrid } = Recharts;
+
+        // Lucide Icons as SVG components
+        const Wallet = () => (
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M21 12V7H5a2 2 0 0 1 0-4h14v4"/>
+                <path d="M3 5v14a2 2 0 0 0 2 2h16v-5"/>
+                <path d="M18 12a2 2 0 0 0 0 4h4v-4Z"/>
+            </svg>
+        );
+
+        const TrendingUp = () => (
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/>
+                <polyline points="17 6 23 6 23 12"/>
+            </svg>
+        );
+
+        const TrendingDown = () => (
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <polyline points="23 18 13.5 8.5 8.5 13.5 1 6"/>
+                <polyline points="17 18 23 18 23 12"/>
+            </svg>
+        );
+
+        const DollarSign = () => (
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <line x1="12" y1="1" x2="12" y2="23"/>
+                <path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/>
+            </svg>
+        );
+
+        const PlusCircle = () => (
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <circle cx="12" cy="12" r="10"/>
+                <line x1="12" y1="8" x2="12" y2="16"/>
+                <line x1="8" y1="12" x2="16" y2="12"/>
+            </svg>
+        );
+
+        const Trash2 = () => (
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <polyline points="3 6 5 6 21 6"/>
+                <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>
+            </svg>
+        );
+
+        const User = () => (
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/>
+                <circle cx="12" cy="7" r="4"/>
+            </svg>
+        );
+
+        const LogOut = () => (
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/>
+                <polyline points="16 17 21 12 16 7"/>
+                <line x1="21" y1="12" x2="9" y2="12"/>
+            </svg>
+        );
+
+        const PieChartIcon = () => (
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <path d="M21.21 15.89A10 10 0 1 1 8 2.83"/>
+                <path d="M22 12A10 10 0 0 0 12 2v10z"/>
+            </svg>
+        );
+
+        function BudgetTracker() {
+            const [currentUser, setCurrentUser] = useState(null);
+            const [username, setUsername] = useState('');
+            const [transactions, setTransactions] = useState([]);
+            const [description, setDescription] = useState('');
+            const [amount, setAmount] = useState('');
+            const [type, setType] = useState('expense');
+            const [category, setCategory] = useState('food');
+            const [loading, setLoading] = useState(true);
+            const [showCharts, setShowCharts] = useState(false);
+
+            const categories = {
+                income: ['Salary', 'Freelance', 'Investment', 'Other'],
+                expense: ['Food', 'Transport', 'Entertainment', 'Bills', 'Shopping', 'Health', 'Other']
+            };
+
+            const COLORS = ['#10b981', '#3b82f6', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899', '#6366f1'];
+
+            useEffect(() => {
+                loadUserData();
+            }, [currentUser]);
+
+            const loadUserData = () => {
+                if (!currentUser) {
+                    setLoading(false);
+                    return;
+                }
+
+                try {
+                    const data = localStorage.getItem(`budget_${currentUser}`);
+                    if (data) {
+                        setTransactions(JSON.parse(data));
+                    }
+                } catch (error) {
+                    console.log('No existing data for user');
+                }
+                setLoading(false);
+            };
+
+            const saveUserData = (data) => {
+                if (!currentUser) return;
+                
+                try {
+                    localStorage.setItem(`budget_${currentUser}`, JSON.stringify(data));
+                } catch (error) {
+                    console.error('Failed to save:', error);
+                }
+            };
+
+            const handleLogin = () => {
+                if (!username.trim()) return;
+                setCurrentUser(username.trim().toLowerCase());
+                setUsername('');
+            };
+
+            const handleLogout = () => {
+                setCurrentUser(null);
+                setTransactions([]);
+            };
+
+            const addTransaction = () => {
+                if (!description || !amount) return;
+
+                const newTransaction = {
+                    id: Date.now(),
+                    description,
+                    amount: parseFloat(amount),
+                    type,
+                    category,
+                    date: new Date().toISOString()
+                };
+
+                const updatedTransactions = [newTransaction, ...transactions];
+                setTransactions(updatedTransactions);
+                saveUserData(updatedTransactions);
+                setDescription('');
+                setAmount('');
+            };
+
+            const deleteTransaction = (id) => {
+                const updatedTransactions = transactions.filter(t => t.id !== id);
+                setTransactions(updatedTransactions);
+                saveUserData(updatedTransactions);
+            };
+
+            const totalIncome = transactions
+                .filter(t => t.type === 'income')
+                .reduce((sum, t) => sum + t.amount, 0);
+
+            const totalExpense = transactions
+                .filter(t => t.type === 'expense')
+                .reduce((sum, t) => sum + t.amount, 0);
+
+            const balance = totalIncome - totalExpense;
+
+            const getExpenseByCategory = () => {
+                const categoryTotals = {};
+                transactions
+                    .filter(t => t.type === 'expense')
+                    .forEach(t => {
+                        categoryTotals[t.category] = (categoryTotals[t.category] || 0) + t.amount;
+                    });
+                
+                return Object.entries(categoryTotals).map(([name, value]) => ({
+                    name: name.charAt(0).toUpperCase() + name.slice(1),
+                    value: parseFloat(value.toFixed(2))
+                }));
+            };
+
+            const getMonthlyData = () => {
+                const monthlyTotals = {};
+                
+                transactions.forEach(t => {
+                    const month = new Date(t.date).toLocaleDateString('en-US', { month: 'short' });
+                    if (!monthlyTotals[month]) {
+                        monthlyTotals[month] = { month, income: 0, expense: 0 };
+                    }
+                    if (t.type === 'income') {
+                        monthlyTotals[month].income += t.amount;
+                    } else {
+                        monthlyTotals[month].expense += t.amount;
+                    }
+                });
+
+                return Object.values(monthlyTotals);
+            };
+
+            if (loading) {
+                return (
+                    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center">
+                        <div className="text-xl text-gray-600">Loading...</div>
+                    </div>
+                );
+            }
+
+            if (!currentUser) {
+                return (
+                    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center p-4">
+                        <div className="bg-white rounded-2xl shadow-2xl p-8 max-w-md w-full">
+                            <div className="text-center mb-8">
+                                <div className="flex justify-center mb-4">
+                                    <div className="w-16 h-16 text-indigo-600"><Wallet /></div>
+                                </div>
+                                <h1 className="text-3xl font-bold text-gray-800 mb-2">Budget Tracker</h1>
+                                <p className="text-gray-600">Track your finances with ease</p>
+                            </div>
+
+                            <div className="space-y-4">
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-700 mb-2">Enter Your Username</label>
+                                    <input
+                                        type="text"
+                                        value={username}
+                                        onChange={(e) => setUsername(e.target.value)}
+                                        onKeyDown={(e) => e.key === 'Enter' && handleLogin()}
+                                        placeholder="e.g., john_doe"
+                                        className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                                    />
+                                </div>
+                                <button
+                                    onClick={handleLogin}
+                                    className="w-full bg-indigo-600 text-white py-3 rounded-lg font-semibold hover:bg-indigo-700 transition-colors"
+                                >
+                                    Continue
+                                </button>
+                                <p className="text-xs text-gray-500 text-center">Your data will be saved and accessible anytime you return</p>
+                            </div>
+                        </div>
+                    </div>
+                );
+            }
+
+            const expenseData = getExpenseByCategory();
+            const monthlyData = getMonthlyData();
+
+            return (
+                <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 p-4">
+                    <div className="max-w-6xl mx-auto">
+                        <div className="bg-white rounded-2xl shadow-lg p-6 mb-6">
+                            <div className="flex items-center justify-between mb-6">
+                                <div className="flex items-center gap-3">
+                                    <div className="w-8 h-8 text-indigo-600"><Wallet /></div>
+                                    <div>
+                                        <h1 className="text-3xl font-bold text-gray-800">Budget Tracker</h1>
+                                        <div className="flex items-center gap-2 mt-1">
+                                            <User />
+                                            <span className="text-sm text-gray-600">{currentUser}</span>
+                                        </div>
+                                    </div>
+                                </div>
+                                <button
+                                    onClick={handleLogout}
+                                    className="flex items-center gap-2 px-4 py-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                                >
+                                    <LogOut />
+                                    <span className="hidden sm:inline">Logout</span>
+                                </button>
+                            </div>
+
+                            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                                <div className="bg-gradient-to-br from-green-50 to-green-100 rounded-xl p-4 border border-green-200">
+                                    <div className="flex items-center gap-2 mb-2">
+                                        <TrendingUp />
+                                        <span className="text-sm font-medium text-green-700">Income</span>
+                                    </div>
+                                    <p className="text-2xl font-bold text-green-800">${totalIncome.toFixed(2)}</p>
+                                </div>
+
+                                <div className="bg-gradient-to-br from-red-50 to-red-100 rounded-xl p-4 border border-red-200">
+                                    <div className="flex items-center gap-2 mb-2">
+                                        <TrendingDown />
+                                        <span className="text-sm font-medium text-red-700">Expenses</span>
+                                    </div>
+                                    <p className="text-2xl font-bold text-red-800">${totalExpense.toFixed(2)}</p>
+                                </div>
+
+                                <div className={`bg-gradient-to-br ${balance >= 0 ? 'from-blue-50 to-blue-100 border-blue-200' : 'from-orange-50 to-orange-100 border-orange-200'} rounded-xl p-4 border`}>
+                                    <div className="flex items-center gap-2 mb-2">
+                                        <DollarSign />
+                                        <span className={`text-sm font-medium ${balance >= 0 ? 'text-blue-700' : 'text-orange-700'}`}>Balance</span>
+                                    </div>
+                                    <p className={`text-2xl font-bold ${balance >= 0 ? 'text-blue-800' : 'text-orange-800'}`}>
+                                        ${Math.abs(balance).toFixed(2)}
+                                    </p>
+                                </div>
+                            </div>
+                        </div>
+
+                        {transactions.length > 0 && (
+                            <div className="bg-white rounded-2xl shadow-lg p-6 mb-6">
+                                <div className="flex items-center justify-between mb-4">
+                                    <h2 className="text-xl font-bold text-gray-800 flex items-center gap-2">
+                                        <div className="w-6 h-6 text-indigo-600"><PieChartIcon /></div>
+                                        Analytics
+                                    </h2>
+                                    <button
+                                        onClick={() => setShowCharts(!showCharts)}
+                                        className="text-sm text-indigo-600 hover:text-indigo-700 font-medium"
+                                    >
+                                        {showCharts ? 'Hide Charts' : 'Show Charts'}
+                                    </button>
+                                </div>
+
+                                {showCharts && (
+                                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mt-6">
+                                        {expenseData.length > 0 && (
+                                            <div className="bg-gray-50 rounded-xl p-4">
+                                                <h3 className="text-center font-semibold text-gray-700 mb-4">Expenses by Category</h3>
+                                                <ResponsiveContainer width="100%" height={250}>
+                                                    <PieChart>
+                                                        <Pie
+                                                            data={expenseData}
+                                                            cx="50%"
+                                                            cy="50%"
+                                                            labelLine={false}
+                                                            label={({name, percent}) => `${name} ${(percent * 100).toFixed(0)}%`}
+                                                            outerRadius={80}
+                                                            fill="#8884d8"
+                                                            dataKey="value"
+                                                        >
+                                                            {expenseData.map((entry, index) => (
+                                                                <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                                                            ))}
+                                                        </Pie>
+                                                        <Tooltip />
+                                                    </PieChart>
+                                                </ResponsiveContainer>
+                                            </div>
+                                        )}
+
+                                        {monthlyData.length > 0 && (
+                                            <div className="bg-gray-50 rounded-xl p-4">
+                                                <h3 className="text-center font-semibold text-gray-700 mb-4">Monthly Overview</h3>
+                                                <ResponsiveContainer width="100%" height={250}>
+                                                    <BarChart data={monthlyData}>
+                                                        <CartesianGrid strokeDasharray="3 3" />
+                                                        <XAxis dataKey="month" />
+                                                        <YAxis />
+                                                        <Tooltip />
+                                                        <Legend />
+                                                        <Bar dataKey="income" fill="#10b981" name="Income" />
+                                                        <Bar dataKey="expense" fill="#ef4444" name="Expense" />
+                                                    </BarChart>
+                                                </ResponsiveContainer>
+                                            </div>
+                                        )}
+                                    </div>
+                                )}
+                            </div>
+                        )}
+
+                        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                            <div className="bg-white rounded-2xl shadow-lg p-6">
+                                <h2 className="text-xl font-bold text-gray-800 mb-4 flex items-center gap-2">
+                                    <div className="w-6 h-6 text-indigo-600"><PlusCircle /></div>
+                                    Add Transaction
+                                </h2>
+                                
+                                <div className="space-y-4">
+                                    <div className="grid grid-cols-2 gap-4">
+                                    
